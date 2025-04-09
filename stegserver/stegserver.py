@@ -18,16 +18,12 @@ if not os.path.exists(db_directory):
 def index():
     return render_template('index.html')
 
-# Example chat route
-@app.route('/send_message', methods=['POST'])
-def send_message():
+# Luke route
+@app.route('/luke', methods=['POST'])
+def luke():
     data = request.json
-    user = data.get('user')
-    message = data.get('message')
-
-    # Here you can add your steganography logic
-    print(f"Message from {user}: {message}")
-
+    print(f"Received data: {data}")
+    # Steg logic
     return jsonify({"status": "success", "message": "Message received"})
 
 def get_db_connection():

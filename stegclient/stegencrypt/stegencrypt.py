@@ -31,6 +31,7 @@ try:
     SERVER_URL = sys.argv[6]
     USERNAME = sys.argv[7]
     PASSWORD = sys.argv[8]
+    PUBLIC_KEY_PATH = sys.argv[9]
 except IndexError:
     MASTER_TO_STEG_EXPORT_PATH = r'C:\Users\lstal\Desktop\stegproject\export.txt'
     STEG_TO_MASTER_IMPORT_PATH = r'C:\Users\lstal\Desktop\stegproject\import.txt'
@@ -40,8 +41,8 @@ except IndexError:
     USERNAME = 'luke'
     print("Manual loading: Caution")
 
-with open('public_key.txt', 'rb') as f:
-        PUBLIC_KEY = RSA.import_key(f.read())
+with open(PUBLIC_KEY_PATH, 'rb') as f:
+    PUBLIC_KEY = RSA.import_key(f.read())
 '''
 key = RSA.generate(2048)
 
@@ -66,7 +67,7 @@ def encrypt_image(image_path):
     enc_aes_key = cipher_rsa.encrypt(aes_key)
 
     payload = {
-        'username': base64.b64encode(USERNAME).decode(),
+        'username': USERNAME,
         'key': base64.b64encode(enc_aes_key).decode(),
         'nonce': base64.b64encode(cipher_aes.nonce).decode(),
         'tag': base64.b64encode(tag).decode(),
@@ -75,7 +76,7 @@ def encrypt_image(image_path):
     return payload
 
 def upload_file(img_path):
-    payload = encrypt_image(img_path, PUBLIC_KEY)
+    payload = encrypt_image(img_path)
     url = 'http://localhost:5000/luke'
     response = requests.post(url, json=payload)
     print(response.json())

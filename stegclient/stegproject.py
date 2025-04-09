@@ -22,7 +22,7 @@ dest_path = os.path.join(dirname, 'stegencrypt', 'dests')
 
 # currently assuming only one image at a ztime in the incoming folder, named 0
 incoming_path = os.path.join(dirname, 'stegencrypt', 'incoming', '0.png')
-keys = os.path.join(dirname, 'public_key.pem')
+keys = os.path.join(dirname, 'public_key.txt')
 
 server = 'http://localhost:5000'
 
@@ -40,7 +40,7 @@ with open(incoming_path, "wb") as img_file:
     print(f"Cleared {incoming_path}")
     pass  # Also opens the file to clear it
 
-s1 = subprocess.Popen(['python', steganography, export_path, import_path, source_path, dest_path, incoming_path, server, username, password])
+s1 = subprocess.Popen(['python', steganography, export_path, import_path, source_path, dest_path, incoming_path, server, username, password, keys])
 s2 = subprocess.Popen(['python', gui, export_path, import_path])
 
 s1.wait()
