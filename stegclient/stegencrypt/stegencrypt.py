@@ -9,10 +9,6 @@ import numpy as np
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives import hashes
 
 #Note: Python 3.10
 #Note: we'll use png, because JPG HAS DISTORTION
@@ -60,7 +56,7 @@ def encrypt_image(image_path):
     combined = PASSWORD.encode() + b'||' + image_data
 
     aes_key = get_random_bytes(32)
-    cipher_aes = AES.new(aes_key, AES.MODE_EAX)
+    cipher_aes = AES.new(aes_key, AES.MODE_GCM)
     ciphertext, tag = cipher_aes.encrypt_and_digest(combined)
     
     cipher_rsa = PKCS1_OAEP.new(PUBLIC_KEY)

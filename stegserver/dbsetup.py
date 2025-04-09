@@ -3,7 +3,7 @@ import os
 import sys
 
 # Default to 'db/chatapp.db' if the DATABASE_PATH environment variable is not set
-database_path = os.getenv('DATABASE_PATH', 'db/chatapp.db')
+database_path = os.path.join(os.path.dirname(__file__), '../db/chatapp.db')
 
 # Ensure the directory exists before creating the database file
 db_directory = os.path.dirname(database_path)
