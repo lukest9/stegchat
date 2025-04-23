@@ -12,6 +12,8 @@ import base64
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 
+#python 3.10
+
 dirname = os.path.dirname(__file__) #stegclient/
 SERVER_URL = 'http://localhost:5000'
 USERNAME = "luke" #should be updated
@@ -121,20 +123,37 @@ def poll_for_images():
         try:
             response = s.get( #probably redundant check to see if session is authd
                 f"{SERVER_URL}/sync/{USERNAME}",
-                params={"after": last_seen} #sort of a janky workaround
+                params={"after": last_seen} #sort of a janky workaround with filename as a timestamp
             )
             if response.status_code == 200:
-                filename = response.headers.get("X-Filename")
-                sender = response.headers.get("X-Sender")
+                payload = response.json()
+                filename = base64.b64decode(payload['filename']).decode()
+                sender = base64.b64decode(payload['sender']).decode()
+                enc_key = base64.b64decode(payload['enc_key'])
+                nonce = base64.b64decode(payload['nonce'])
+                tag = base64.b64decode(payload['tag'])
+                ciphertext = base64.b64decode(payload['data'])
+
+                # Decrypt AES key with private RSA
+                private_key = get_private_key()
+                cipher_rsa = PKCS1_OAEP.new(private_key)
+                aes_key = cipher_rsa.decrypt(enc_key)
+
+                # Decrypt image with AES
+                cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
+                image_bytes = cipher.decrypt_and_verify(ciphertext, tag)
+
+                # Save and decode image
+                incoming_path = os.path.join(dirname, "incoming.png")
+                with open(incoming_path, 'wb') as f:
+                    f.write(image_bytes)
+
+                img = cv2.imread(incoming_path)
+                #sender = response.headers.get("X-Sender", "Unknown")
                 if sender not in tabs:
                     create_user_tab(sender)
 
-                incoming_path = os.path.join(dirname, "incoming.png")
-                with open(incoming_path, 'wb') as f:
-                    f.write(response.content)
-                img = cv2.imread(incoming_path)
-                message = steg_decode(img) #if there is going to be some sort of translation error that messes up steg, this is where it will probably be
-                #this is where XOR decoding is needed
+                message = steg_decode(img)
                 display = tabs[sender]['display']
                 display.config(state='normal')
                 display.insert(tk.END, f"{sender}: {message}\n")

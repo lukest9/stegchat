@@ -7,6 +7,7 @@ from Crypto.Signature import pkcs1_15 #this might need to change?
 from Crypto.Hash import SHA256
 import base64, random, string
 from datetime import datetime
+from Crypto.Random import get_random_bytes
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -21,12 +22,12 @@ def get_db_connection():
     return conn
 
 def get_private_key(username):
-    print("Attempting to get private key")
+    #print("Attempting to get private key")
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT private_key FROM users WHERE username = ?', (username,))
     row = cursor.fetchone()
-    print(f"Pulled row from table: {row}")
+    #print(f"Pulled row from table: {row}")
     conn.close()
     if not row:
         raise ValueError(f"User ({username}) not found.")
@@ -37,12 +38,12 @@ def load_private_key(private_key_pem):
     return RSA.import_key(private_key_pem.encode())
 
 def get_public_key(username):
-    print("Attempting to get public key")
+    #print("Attempting to get public key")
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT public_key FROM users WHERE username = ?', (username,))
     row = cursor.fetchone()
-    print(f"Pulled row from table: {row}")
+    #print(f"Pulled row from table: {row}")
     conn.close()
     if not row:
         raise ValueError(f"User ({username}) not found.")
@@ -74,7 +75,7 @@ def print_database_contents(): #this probably is a security risk, so delete afte
 # AUTH page -----
 
 @app.route('/auth/challenge', methods=['POST'])
-def auth_challenge():
+def auth_challenge(): #rate limit/IP based
     challenge = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
     session['challenge'] = challenge
     return jsonify({'challenge': challenge})
@@ -168,7 +169,36 @@ def download(target):
     if not filepath:
         abort(404, description='No images found')
 
-    return send_file(filepath, mimetype='image/png')
+    try:
+        # Load the file
+        with open(filepath, 'rb') as f:
+            image_data = f.read()
+
+        # Encrypt using AES key
+        aes_key = get_random_bytes(32)
+        cipher_aes = AES.new(aes_key, AES.MODE_GCM)
+        ciphertext, tag = cipher_aes.encrypt_and_digest(image_data)
+
+        # Get public key of recipient
+        public_key_pem = get_public_key(target)
+        public_key = RSA.import_key(public_key_pem.encode())
+
+        cipher_rsa = PKCS1_OAEP.new(public_key)
+        enc_key = cipher_rsa.encrypt(aes_key)
+
+        # Build payload
+        payload = {
+            'enc_key': base64.b64encode(enc_key).decode(),
+            'nonce': base64.b64encode(cipher_aes.nonce).decode(),
+            'tag': base64.b64encode(tag).decode(),
+            'data': base64.b64encode(ciphertext).decode()
+        }
+
+        return jsonify(payload), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 # SYNC page -----
 
@@ -191,17 +221,37 @@ def sync(target):
         next_file = files[0]
         file_path = os.path.join(folder, next_file)
         meta_path = file_path + ".meta"
-        if not os.path.exists(meta_path):
+        if not os.path.exists(meta_path): #just redundancy to avoid error
             with open(meta_path, 'w') as f:
                 f.write("Anonymous") #should always get overwritten
 
         with open(meta_path, 'r') as f:
             sender = f.read().strip() #the .meta file right now just has the sender username, it's technically secure, maybe vulnerable to a verified /upload manipulated packet
 
-        response = make_response(send_file(file_path, mimetype='image/png'))
-        response.headers['X-Filename'] = next_file #idk what the X- stuff really does, but someone used it in a flask example, and it works
-        response.headers['X-Sender'] = sender
-        return response
+        with open(file_path, 'rb') as f:
+            image_data = f.read()
+        
+        aes_key = get_random_bytes(32)
+        cipher_aes = AES.new(aes_key, AES.MODE_GCM)
+        ciphertext, tag = cipher_aes.encrypt_and_digest(image_data)
+
+        # Encrypt AES key with target's public key
+        public_key_pem = get_public_key(target)
+        public_key = RSA.import_key(public_key_pem.encode())
+        cipher_rsa = PKCS1_OAEP.new(public_key)
+        enc_key = cipher_rsa.encrypt(aes_key)
+
+        # Build response payload
+        payload = {
+            'filename': base64.b64encode(next_file.encode()).decode(),
+            'sender': base64.b64encode(sender.encode()).decode(),
+            'enc_key': base64.b64encode(enc_key).decode(),
+            'nonce': base64.b64encode(cipher_aes.nonce).decode(),
+            'tag': base64.b64encode(tag).decode(),
+            'data': base64.b64encode(ciphertext).decode()
+        }
+
+        return jsonify(payload), 200
     else:
         return jsonify({'message': 'No new images'}), 204
 
@@ -210,7 +260,7 @@ def sync(target):
 @app.route('/key/<username>', methods=['GET'])
 def key(username):
     try:
-        print(f"Trying get_public_key{username}")
+        #print(f"Trying get_public_key{username}")
         public_key_pem = get_public_key(username)
         return jsonify({'public_key': public_key_pem}), 200
     except ValueError as e:
