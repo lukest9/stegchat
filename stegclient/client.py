@@ -214,19 +214,44 @@ def get_public_key():
 def create_user_tab(username):
     if username in tabs:
         return
-    frame = tk.Frame(chat_tabs)
-    chat_display = tk.Text(frame, height=15, width=50, state='disabled')
-    chat_display.pack(pady=10)
+    frame = ttk.Frame(chat_tabs, style="TFrame")
+    frame.pack(fill='both', expand=True)
+    frame.columnconfigure(0, weight=1)
 
-    message_entry = tk.Entry(frame, width=50)
-    message_entry.pack(pady=5)
+    chat_display = tk.Text(
+        frame,
+        height=15,
+        bg=DARKER_BG,
+        fg=TEXT_COLOR,
+        insertbackground=TEXT_COLOR,
+        relief='flat',
+        wrap='word',
+        state='disabled'
+    )
+    chat_display.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="nsew")
+
+    message_entry = tk.Entry(
+        frame,
+        bg=ENTRY_BG,
+        fg=TEXT_COLOR,
+        insertbackground=TEXT_COLOR,
+        relief='flat'
+    )
+    message_entry.grid(row=1, column=0, padx=(10, 5), pady=(0, 10), sticky="ew")
 
     send_button = tk.Button(
         frame,
-        text="Send Message",
+        text="Send",
+        bg=ACCENT_COLOR,
+        fg='white',
+        activebackground='#677bc4',
+        relief='flat',
+        bd=0,
         command=lambda: send_message(username)
     )
-    send_button.pack(pady=5)
+    send_button.grid(row=1, column=1, padx=(5, 10), pady=(0, 10))
+
+    frame.rowconfigure(0, weight=1)
 
     chat_tabs.add(frame, text=username)
     tabs[username] = {
@@ -238,13 +263,67 @@ def create_user_tab(username):
 last_seen = datetime.now().strftime('%Y%m%d%H%M%S') #in a very robust world, this would be the last time you polled the server, and then when you log back in, it would pull and present all of your new messages
 authorize(s)
 
+DARK_BG = "#1e1e2f"
+DARKER_BG = "#161624"
+TEXT_COLOR = "#ffffff"
+ACCENT_COLOR = "#3a66ff"
+ENTRY_BG = "#2a2a3a"
+
 root = tk.Tk()
-root.title("Stegchat")
-root.geometry("500x400")
+root.geometry("600x450")
+root.overrideredirect(True)
+root.configure(bg=DARK_BG)
+
+is_maximized = [False]
+
+title_bar = tk.Frame(root, bg="#2e2e2e", relief='raised', bd=0)
+title_bar.pack(fill=tk.X)
+
+title_label = tk.Label(title_bar, text="STEGCHAT", bg="#2e2e2e", fg="white", font=("Times New Roman", 10, "bold"))
+title_label.pack(side=tk.LEFT, padx=10)
+
+def minimize_window():
+    root.geometry("600x450")
+    is_maximized[0] = False
+
+def toggle_maximize():
+    if is_maximized[0]:
+        root.geometry("600x450")
+        is_maximized[0] = False
+    else:
+        root.geometry(f"{root.winfo_screenwidth()}x{root.winfo_screenheight()}+0+0")
+        is_maximized[0] = True
+
+def move_window(event):
+    root.geometry(f"+{event.x_root}+{event.y_root}")
+
+close_button = tk.Button(title_bar, text='X', bg="#2e2e2e", fg="white", command=root.destroy, bd=0, font=("Times New Roman", 12, "bold"))
+close_button.pack(side=tk.RIGHT, padx=5)
+
+maximize_btn = tk.Button(title_bar, text='⬜', bg="#2e2e2e", fg="white", bd=0, command=toggle_maximize, font=("Times New Roman", 8, "bold"))
+maximize_btn.pack(side=tk.RIGHT, padx=5)
+
+minimize_btn = tk.Button(title_bar, text='▪', bg="#2e2e2e", fg="white", bd=0, command=minimize_window, font=("Times New Roman", 12, "bold"))
+minimize_btn.pack(side=tk.RIGHT, padx=5)
+
+title_bar.bind("<B1-Motion>", move_window)
+
+style = ttk.Style()
+style.theme_use('default')
+
+style.configure("TNotebook", background=DARK_BG, borderwidth=0)
+style.configure("TNotebook.Tab", background=DARKER_BG, foreground=TEXT_COLOR, padding=[12, 6])
+style.map("TNotebook.Tab",
+          background=[("selected", ACCENT_COLOR)],
+          foreground=[("selected", "#ffffff")])
+
+style.configure("TButton", background=ACCENT_COLOR, foreground="#ffffff", padding=6)
+style.map("TButton",
+          background=[("active", "#677bc4")])
 
 tabs = {}
 chat_tabs = ttk.Notebook(root)
-chat_tabs.pack(fill='both', expand=True)
+chat_tabs.pack(fill='both', expand=True) #padx, pady = 10
 
 #chat_display = tk.Text(root, height=15, width=60, state="disabled")
 #chat_display.pack(pady=10)
